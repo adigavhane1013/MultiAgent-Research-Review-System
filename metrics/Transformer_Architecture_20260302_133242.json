@@ -1,0 +1,18 @@
+{
+    "topic": "Transformer Architecture",
+    "timestamp": "20260302_133242",
+    "total_claims": 9,
+    "verified_claims": 9,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 10,
+    "run_duration_seconds": 118.58,
+    "run_duration_minutes": 1.98,
+    "retry_used": true,
+    "verdict": "PASS"
+}

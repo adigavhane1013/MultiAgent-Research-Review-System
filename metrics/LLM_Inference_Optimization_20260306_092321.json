@@ -1,0 +1,18 @@
+{
+    "topic": "LLM Inference Optimization",
+    "timestamp": "20260306_092321",
+    "total_claims": 0,
+    "verified_claims": 0,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 0.0,
+    "citation_coverage_percent": 0.0,
+    "structure_score": 0.0,
+    "clarity_score": 0.0,
+    "factual_confidence_score": 0.0,
+    "sources_used": 20,
+    "run_duration_seconds": 110.27,
+    "run_duration_minutes": 1.84,
+    "retry_used": false,
+    "verdict": "FAIL"
+}

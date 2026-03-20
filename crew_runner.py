@@ -12,18 +12,23 @@ def build_crew(topic: str):
 
     # --------------------------------------------
     # 2. Fetch Search Context
+    # Multi-source: Tavily + DuckDuckGo + Wikipedia
+    # search_web() returns (context_string, source_count)
     # --------------------------------------------
-    search_context = search_web(topic)
+    search_context, source_count = search_web(topic)
 
     # --------------------------------------------
     # 3. Build Tasks (Inject Search Context)
+    # search_context passed to BOTH research and
+    # validator tasks — validator uses it to cross-check
+    # that writer citations came from real sources
     # --------------------------------------------
     research_task, writer_task, validator_task = create_tasks(
         research_agent,
         writer_agent,
         validator_agent,
         topic,
-        search_context
+        search_context,
     )
 
     # --------------------------------------------
@@ -32,7 +37,7 @@ def build_crew(topic: str):
     crew = Crew(
         agents=[research_agent, writer_agent, validator_agent],
         tasks=[research_task, writer_task, validator_task],
-        verbose=True
+        verbose=True,
     )
 
-    return crew
+    return crew, source_count

@@ -1,0 +1,18 @@
+{
+    "topic": "AI Hallucination",
+    "timestamp": "20260302_134834",
+    "total_claims": 0,
+    "verified_claims": 23,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 0.0,
+    "citation_coverage_percent": 0.0,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 10,
+    "run_duration_seconds": 81.98,
+    "run_duration_minutes": 1.37,
+    "retry_used": false,
+    "verdict": "PASS"
+}

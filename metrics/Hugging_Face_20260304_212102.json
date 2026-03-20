@@ -1,0 +1,18 @@
+{
+    "topic": "Hugging Face",
+    "timestamp": "20260304_212102",
+    "total_claims": 10,
+    "verified_claims": 8,
+    "unsupported_claims": 2,
+    "missing_citations": 0,
+    "verification_rate_percent": 80.0,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 12,
+    "run_duration_seconds": 191.35,
+    "run_duration_minutes": 3.19,
+    "retry_used": true,
+    "verdict": "FAIL"
+}

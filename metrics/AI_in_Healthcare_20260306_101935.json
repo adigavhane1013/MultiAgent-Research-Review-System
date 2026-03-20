@@ -1,0 +1,18 @@
+{
+    "topic": "AI in Healthcare",
+    "timestamp": "20260306_101935",
+    "total_claims": 14,
+    "verified_claims": 14,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 107.14,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 21,
+    "run_duration_seconds": 162.68,
+    "run_duration_minutes": 2.71,
+    "retry_used": false,
+    "verdict": "PASS"
+}

@@ -1,0 +1,18 @@
+{
+    "topic": "Convolutional Neural Networks",
+    "timestamp": "20260306_103834",
+    "total_claims": 11,
+    "verified_claims": 11,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 109.09,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 16,
+    "run_duration_seconds": 132.15,
+    "run_duration_minutes": 2.2,
+    "retry_used": false,
+    "verdict": "PASS"
+}

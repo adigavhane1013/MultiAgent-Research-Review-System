@@ -1,0 +1,18 @@
+{
+    "topic": "\"Mixture of Experts (MoE)\"",
+    "timestamp": "20260303_133501",
+    "total_claims": 12,
+    "verified_claims": 12,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 8,
+    "run_duration_seconds": 79.81,
+    "run_duration_minutes": 1.33,
+    "retry_used": false,
+    "verdict": "PASS"
+}
