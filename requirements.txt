@@ -1,7 +1,19 @@
-# Required packages
-
-flask==2.0.1
-requests==2.25.1
-numpy==1.21.0
+# ================================
+# Multi-Agent Research System
+# ================================
+# Core agent framework
+crewai==1.7.2
+# LLM provider — version pinned to match crewai's openai~=1.83.0 requirement
+litellm==1.57.4
+# Search tools
+tavily-python==0.7.21
+duckduckgo-search==8.1.1
+# Wikipedia search
+wikipedia-api==0.10.0
 wikipedia==1.4.0
-# Other packages...
+# HTTP requests (model testing)
+requests==2.32.5
+# Environment variables
+python-dotenv==1.1.1
+# Typing support
+typing_extensions>=4.9.0
