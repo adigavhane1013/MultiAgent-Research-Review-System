@@ -1,26 +1,48 @@
-name: Run Guard Tests
+name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
+
+# Cancels redundant builds if you push multiple times quickly
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    name: Pytest and Validation
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4 # Fixes Node.js 16 deprecation
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # Fixes Node.js 16 deprecation
         with:
-          python-version: '3.11'
+          python-version: '3.10'
+          cache: 'pip' # Speeds up future runs
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Ensure test tools are present
+          pip install pytest pytest-mock
 
-      - name: Run guard tests
-        run: pytest test_guards.py -v
+      - name: Run Tests
+        # CRITICAL: Providing dummy keys prevents LLM initialization errors (401s) 
+        # that happen when the code imports 'litellm' or 'crewai' during CI.
+        env:
+          OPENROUTER_API_KEY: "sk-or-v1-dummy-key-for-testing"
+          GOOGLE_API_KEY: "dummy-google-key"
+          TAVILY_API_KEY: "dummy-tavily-key"
+        run: |
+          # Use -v for detail and --maxfail to stop if the first 2 tests fail
+          pytest test_guards.py -v --maxfail=2
