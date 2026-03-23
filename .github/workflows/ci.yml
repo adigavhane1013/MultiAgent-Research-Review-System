@@ -21,13 +21,14 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4 # Fixes Node.js 16 deprecation
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # Fixes Node.js 16 deprecation
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip' # Speeds up future runs
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
 
       - name: Install Dependencies
         run: |
@@ -37,12 +38,14 @@ jobs:
           pip install pytest pytest-mock
 
       - name: Run Tests
-        # CRITICAL: Providing dummy keys prevents LLM initialization errors (401s) 
-        # that happen when the code imports 'litellm' or 'crewai' during CI.
         env:
+          PYTHONPATH: ${{ github.workspace }}
+          TESTING: "true"
           OPENROUTER_API_KEY: "sk-or-v1-dummy-key-for-testing"
           GOOGLE_API_KEY: "dummy-google-key"
           TAVILY_API_KEY: "dummy-tavily-key"
+          LANGSMITH_API_KEY: "dummy-langsmith-key"
+          LITELLM_API_KEY: "dummy-litellm-key"
         run: |
           # Use -v for detail and --maxfail to stop if the first 2 tests fail
-          pytest test_guards.py -v --maxfail=2
+          pytest test_guards.py -v --maxfail=2 --tb=short
