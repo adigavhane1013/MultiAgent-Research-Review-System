@@ -10,10 +10,10 @@ tavily-python==0.7.21
 duckduckgo-search==8.1.1
 # Wikipedia search
 wikipedia-api==0.10.0
+wikipedia==1.9.1
 # HTTP requests (model testing)
 requests==2.32.5
 # Environment variables
 python-dotenv==1.1.1
 # Typing support
 typing_extensions>=4.9.0
-
