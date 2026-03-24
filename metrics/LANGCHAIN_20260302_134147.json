@@ -1,0 +1,18 @@
+{
+    "topic": "LANGCHAIN",
+    "timestamp": "20260302_134147",
+    "total_claims": 27,
+    "verified_claims": 25,
+    "unsupported_claims": 2,
+    "missing_citations": 0,
+    "verification_rate_percent": 92.59,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 0.0,
+    "clarity_score": 0.0,
+    "factual_confidence_score": 0.0,
+    "sources_used": 10,
+    "run_duration_seconds": 202.06,
+    "run_duration_minutes": 3.37,
+    "retry_used": true,
+    "verdict": "FAIL"
+}

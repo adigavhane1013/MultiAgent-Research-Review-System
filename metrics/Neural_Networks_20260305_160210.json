@@ -1,0 +1,18 @@
+{
+    "topic": "Neural Networks",
+    "timestamp": "20260305_160210",
+    "total_claims": 36,
+    "verified_claims": 36,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 0.0,
+    "clarity_score": 0.0,
+    "factual_confidence_score": 0.0,
+    "sources_used": 18,
+    "run_duration_seconds": 328.48,
+    "run_duration_minutes": 5.47,
+    "retry_used": false,
+    "verdict": "FAIL"
+}

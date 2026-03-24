@@ -1,0 +1,18 @@
+{
+    "topic": "Time Series Forecasting",
+    "timestamp": "20260306_105255",
+    "total_claims": 12,
+    "verified_claims": 12,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 108.33,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 15,
+    "run_duration_seconds": 164.65,
+    "run_duration_minutes": 2.74,
+    "retry_used": false,
+    "verdict": "PASS"
+}

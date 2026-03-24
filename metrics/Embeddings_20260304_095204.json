@@ -1,0 +1,18 @@
+{
+    "topic": "Embeddings",
+    "timestamp": "20260304_095204",
+    "total_claims": 19,
+    "verified_claims": 18,
+    "unsupported_claims": 1,
+    "missing_citations": 0,
+    "verification_rate_percent": 94.74,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 0.0,
+    "clarity_score": 0.0,
+    "factual_confidence_score": 0.0,
+    "sources_used": 10,
+    "run_duration_seconds": 189.93,
+    "run_duration_minutes": 3.17,
+    "retry_used": false,
+    "verdict": "FAIL"
+}

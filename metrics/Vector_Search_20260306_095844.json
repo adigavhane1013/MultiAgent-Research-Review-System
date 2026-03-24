@@ -1,0 +1,18 @@
+{
+    "topic": "Vector Search",
+    "timestamp": "20260306_095844",
+    "total_claims": 15,
+    "verified_claims": 15,
+    "unsupported_claims": 0,
+    "missing_citations": 0,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 100.0,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 20,
+    "run_duration_seconds": 218.75,
+    "run_duration_minutes": 3.65,
+    "retry_used": false,
+    "verdict": "PASS"
+}

@@ -1,0 +1,18 @@
+{
+    "topic": "VECTOR DATABASES",
+    "timestamp": "20260302_123446",
+    "total_claims": 16,
+    "verified_claims": 16,
+    "unsupported_claims": 0,
+    "missing_citations": 1,
+    "verification_rate_percent": 100.0,
+    "citation_coverage_percent": 93.75,
+    "structure_score": 10.0,
+    "clarity_score": 10.0,
+    "factual_confidence_score": 10.0,
+    "sources_used": 5,
+    "run_duration_seconds": 152.83,
+    "run_duration_minutes": 2.55,
+    "retry_used": true,
+    "verdict": "PASS"
+}
