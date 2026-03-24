@@ -8,6 +8,7 @@ litellm==1.57.4
 # Search tools
 tavily-python==0.7.21
 duckduckgo-search==8.1.1
+ddgs==9.11.1
 # Wikipedia search
 wikipedia-api==0.10.0
 wikipedia==1.4.0
