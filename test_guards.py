@@ -10,13 +10,19 @@ Run with:
 Real bugs these tests are based on:
 - Guard 1: MoE run returned "!!!!!!!" garbage
 - Guard 1: Agentic AI run — researcher returned filler only, zero SOURCE_QUOTEs
+- Guard 1: Fix 3 — compact [Category|N] format was not recognised by Guard 1,
+           causing every valid compact researcher output to fail Guard 1
 - Guard 2: Prompt Engineering run — writer returned filler with no document
 - Guard 2: Agentic AI run — writer invented document with only 1 citation
 - Guard 3: RLHF run — validator said PASS but 3 claims had VERIFIED: NO
 - Guard 3: Neural Networks — DUPLICATE_EVIDENCE abuse passed validator
 - Guard 3: Agentic AI — QUOTE_IN_SOURCES: NO (fabricated quotes)
+- Guard 3: Fix 5 — compact Q:/D:/S:/V: signals must also trigger verdict override
 - Guard 4: Kubernetes run — validator output truncated by MAX_TOKENS
+- Guard 4: Fix 5 — compact C: claim lines must be accepted (not just CLAIM:)
 """
+import os
+os.environ["TESTING"] = "1"  # add right after the imports
 
 import pytest
 from main import (
@@ -105,6 +111,64 @@ def test_guard1_passes_with_two_source_quotes():
     CATEGORY: Features
     """
     assert _is_valid_research_output(two_quotes) is True
+
+
+# ----------------------------------------------------------------
+# GUARD 1 — Compact format tests (Fix 3: [Category|N] format)
+# ----------------------------------------------------------------
+
+def test_guard1_passes_compact_format():
+    """✅ Fix 3 — compact [Category|N] lines should pass Guard 1"""
+    compact = (
+        '[General|1] "Redis is an open-source in-memory data structure store used as a database cache."\n'
+        '[Features|2] "Redis supports strings, hashes, lists, sets, and sorted sets with range queries."\n'
+        '[UseCases|3] "Uber uses Redis for real-time trip tracking and driver dispatching at scale."\n'
+    )
+    assert _is_valid_research_output(compact) is True
+
+
+def test_guard1_compact_all_four_categories_recognised():
+    """✅ All four category prefixes (General/Features/UseCases/Limitations) must be valid"""
+    for cat in ["General", "Features", "UseCases", "Limitations"]:
+        output = (
+            f'[{cat}|1] "Some specific verifiable fact extracted directly from a real source."\n'
+            f'[{cat}|2] "Another specific fact about a named company or domain with enough detail."\n'
+        )
+        assert _is_valid_research_output(output) is True, f"Category '{cat}' not recognised by Guard 1"
+
+
+def test_guard1_compact_invalid_category_not_counted():
+    """❌ Unknown category prefix must NOT count as a valid signal"""
+    invalid = (
+        '[Unknown|1] "This should not count as a valid compact signal at all here."\n'
+        '[Random|2] "Neither should this one count as a valid structured fact output."\n'
+    )
+    assert _is_valid_research_output(invalid) is False
+
+
+def test_guard1_compact_single_signal_fails():
+    """❌ Only 1 compact signal — minimum is 2 (same threshold as legacy format)"""
+    one_signal = '[General|1] "Redis is a fast in-memory database widely used in production systems."\n'
+    assert _is_valid_research_output(one_signal) is False
+
+
+def test_guard1_mixed_format_passes():
+    """✅ Mix of legacy SOURCE_QUOTE and compact [Category|N] both count toward minimum"""
+    mixed = (
+        'SOURCE_QUOTE: "Redis was created by Salvatore Sanfilippo in 2009 as an in-memory key-value store."\n'
+        '[Features|2] "Redis supports pub/sub messaging, atomic operations, and Lua scripting natively."\n'
+    )
+    assert _is_valid_research_output(mixed) is True
+
+
+def test_guard1_compact_filler_still_fails():
+    """❌ Compact signals present but filler phrase at start — must still fail"""
+    filler_with_compact = (
+        'I now can give a great answer about Redis performance.\n'
+        '[General|1] "Redis is an in-memory data structure store used as a database and cache."\n'
+        '[Features|2] "Redis supports atomic operations on strings, hashes, lists, sets and sorted sets."\n'
+    )
+    assert _is_valid_research_output(filler_with_compact) is False
 
 
 # ================================================================
@@ -444,6 +508,103 @@ Verdict: PASS
     assert _get_true_verdict(semantic_pass) == "PASS"
 
 
+# ----------------------------------------------------------------
+# GUARD 3 — Compact format signal tests (Fix 5: Q:/D:/S:/V: format)
+# ----------------------------------------------------------------
+
+def test_guard3_compact_q_no_overrides_pass():
+    """❌ Fix 5 — compact Q: NO (fabricated quote) must override stated PASS"""
+    compact_fabricated = """
+C: Redis was invented in 2005 by engineers at Twitter for caching tweets.
+Q: NO | D: NO | S: NO | V: FAIL
+
+Structure Score: 10/10
+Clarity Score: 10/10
+Factual Confidence: 10/10
+Verdict: PASS
+"""
+    assert _get_true_verdict(compact_fabricated) == "FAIL"
+
+
+def test_guard3_compact_d_yes_overrides_pass():
+    """❌ Fix 5 — compact D: YES (duplicate evidence) must override stated PASS"""
+    compact_duplicate = """
+C: Redis supports pub/sub messaging for event-driven architectures.
+Q: YES | D: YES | S: YES | V: PASS
+
+Structure Score: 10/10
+Clarity Score: 10/10
+Factual Confidence: 10/10
+Verdict: PASS
+"""
+    assert _get_true_verdict(compact_duplicate) == "FAIL"
+
+
+def test_guard3_compact_s_no_overrides_pass():
+    """❌ Fix 5 — compact S: NO (semantic mismatch) must override stated PASS"""
+    compact_semantic = """
+C: Redis has significant limitations and is known to be slow in production.
+Q: YES | D: NO | S: NO | V: FAIL
+
+Structure Score: 10/10
+Clarity Score: 10/10
+Factual Confidence: 10/10
+Verdict: PASS
+"""
+    assert _get_true_verdict(compact_semantic) == "FAIL"
+
+
+def test_guard3_compact_v_fail_overrides_pass():
+    """❌ Fix 5 — compact V: FAIL must override stated PASS"""
+    compact_verdict_fail = """
+C: Redis was originally designed for PostgreSQL as a caching layer only.
+Q: NO | D: NO | S: NO | V: FAIL
+
+Structure Score: 10/10
+Clarity Score: 10/10
+Factual Confidence: 10/10
+Verdict: PASS
+"""
+    assert _get_true_verdict(compact_verdict_fail) == "FAIL"
+
+
+def test_guard3_compact_all_pass_stays_pass():
+    """✅ Fix 5 — all compact signals passing (Q:YES D:NO S:YES V:PASS) stays PASS"""
+    clean_compact = """
+C: Redis stores data in memory for fast read and write operations.
+Q: YES | D: NO | S: YES | V: PASS
+C: Redis was created by Salvatore Sanfilippo and released in 2009.
+Q: YES | D: NO | S: YES | V: PASS
+C: Uber uses Redis for real-time trip tracking and driver location caching.
+Q: YES | D: NO | S: YES | V: PASS
+
+Structure Score: 10/10
+Clarity Score: 10/10
+Factual Confidence: 10/10
+Verdict: PASS
+"""
+    assert _get_true_verdict(clean_compact) == "PASS"
+
+
+def test_guard3_compact_backward_compat_with_legacy():
+    """✅ Fix 5 — mixed compact + legacy signals in same output both detected"""
+    mixed_signals = """
+CLAIM: Some legacy-format claim here.
+QUOTE_IN_SOURCES: NO
+VERIFIED: NO
+VERDICT: FAIL
+
+C: Some compact-format claim here with a fabricated quote added.
+Q: NO | D: NO | S: NO | V: FAIL
+
+Structure Score: 10/10
+Clarity Score: 10/10
+Factual Confidence: 10/10
+Verdict: PASS
+"""
+    assert _get_true_verdict(mixed_signals) == "FAIL"
+
+
 # ================================================================
 # GUARD 4 — Validator Output Quality
 # ================================================================
@@ -531,3 +692,81 @@ Structure Score: 10/10
 Verdict: PASS
 """
     assert _is_valid_validator_output(filler) is False
+
+
+# ----------------------------------------------------------------
+# GUARD 4 — Compact format tests (Fix 5: C: claim line format)
+# ----------------------------------------------------------------
+
+def test_guard4_passes_compact_validator_output():
+    """✅ Fix 5 — compact C: claim lines should be accepted by Guard 4"""
+    compact = (
+        'C: Redis stores data in memory for extremely fast read and write operations.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis was created by Salvatore Sanfilippo and first released publicly in 2009.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'Structure Score: 10/10\n'
+        'Clarity Score: 10/10\n'
+        'Factual Confidence: 10/10\n'
+        'Verdict: PASS\n'
+    )
+    assert _is_valid_validator_output(compact) is True
+
+
+def test_guard4_compact_missing_score_lines_fails():
+    """❌ Fix 5 — compact C: audit present but score lines truncated — must fail"""
+    truncated_compact = (
+        'C: Redis stores data in memory for fast access.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis supports atomic operations on multiple data types natively.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+    )
+    assert _is_valid_validator_output(truncated_compact) is False
+
+
+def test_guard4_compact_no_claim_lines_fails():
+    """❌ Fix 5 — score lines present but zero C: or CLAIM: entries — audit was skipped"""
+    no_audit = (
+        'The document appears well-structured with adequate sourcing throughout.\n'
+        'All claims seem reasonable based on the provided search context available.\n'
+        'Structure Score: 10/10\n'
+        'Clarity Score: 10/10\n'
+        'Factual Confidence: 10/10\n'
+        'Verdict: PASS\n'
+    )
+    assert _is_valid_validator_output(no_audit) is False
+
+
+def test_guard4_legacy_claim_still_accepted():
+    """✅ Fix 5 — legacy CLAIM: format must still pass Guard 4 (backward compat)"""
+    legacy = (
+        'CLAIM: Redis is a fast in-memory data structure store.\n'
+        'CITE_TAG_PRESENT: YES\n'
+        'EVIDENCE: "Redis is a fast in-memory data structure store."\n'
+        'QUOTE_IN_SOURCES: YES\n'
+        'DUPLICATE_EVIDENCE: NO\n'
+        'VERIFIED: YES\n'
+        'VERDICT: PASS\n'
+        'Structure Score: 10/10\n'
+        'Clarity Score: 10/10\n'
+        'Factual Confidence: 10/10\n'
+        'Verdict: PASS\n'
+    )
+    assert _is_valid_validator_output(legacy) is True
+
+
+def test_guard4_mixed_compact_and_legacy_accepted():
+    """✅ Fix 5 — validator output mixing CLAIM: and C: lines must pass Guard 4"""
+    mixed = (
+        'CLAIM: Redis is widely used as a caching layer in production systems.\n'
+        'CITE_TAG_PRESENT: YES\n'
+        'VERIFIED: YES\n'
+        'VERDICT: PASS\n'
+        'C: Redis was released in 2009 and has grown to millions of deployments worldwide.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'Structure Score: 10/10\n'
+        'Clarity Score: 10/10\n'
+        'Factual Confidence: 10/10\n'
+        'Verdict: PASS\n'
+    )
+    assert _is_valid_validator_output(mixed) is True

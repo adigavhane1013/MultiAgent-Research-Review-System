@@ -40,7 +40,7 @@ jobs:
       - name: Run Tests
         env:
           PYTHONPATH: ${{ github.workspace }}
-          TESTING: "true"
+          TESTING: "1"
           OPENROUTER_API_KEY: "sk-or-v1-dummy-key-for-testing"
           GOOGLE_API_KEY: "dummy-google-key"
           TAVILY_API_KEY: "dummy-tavily-key"

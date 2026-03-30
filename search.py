@@ -11,18 +11,20 @@ How it works:
   - All results combined and deduplicated by URL
   - Low quality domains filtered out (Reddit, Quora, social media)
   - Thin content filtered out (< 200 chars)
+  - Content capped at 1500 chars per source (token optimization)
   - Final clean sources passed as one context string to the researcher
+  - Extracted quotes list built separately for validator (token optimization)
 
 Install requirements:
   pip install tavily-python duckduckgo-search wikipedia-api
 """
 
 import os
-import time
 import re
+import time
 import wikipedia
 from tavily import TavilyClient
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 # ================================================================
 # LOW QUALITY DOMAINS — filtered before passing to agents
@@ -50,7 +52,7 @@ LOW_QUALITY_DOMAINS = [
 TAVILY_MAX_RESULTS   = 7
 DDG_MAX_RESULTS      = 5
 MIN_CONTENT_LENGTH   = 200
-CONTENT_LIMIT        = 3000   # chars per source passed to researcher
+CONTENT_LIMIT        = 1500   # reduced from 3000 — 50% input token saving
 SEARCH_DELAY_SECONDS = 2      # delay between searches (rate limit safety)
 
 
@@ -74,6 +76,25 @@ def _clean_text(text: str) -> str:
     return text.strip()
 
 
+def extract_quotes(search_context: str) -> str:
+    """
+    Extracts only quoted sentences from full search context.
+    Used by validator instead of full context — major token saving.
+    Returns a compact list of up to 80 unique quotes.
+    """
+    quotes = re.findall(r'"([^"]{20,300})"', search_context)
+    seen = set()
+    unique = []
+    for q in quotes:
+        q_clean = q.strip()
+        if q_clean not in seen:
+            seen.add(q_clean)
+            unique.append(f'- "{q_clean}"')
+        if len(unique) >= 80:
+            break
+    return "\n".join(unique)
+
+
 # ================================================================
 # SOURCE 1 — TAVILY
 # ================================================================
@@ -81,7 +102,7 @@ def _clean_text(text: str) -> str:
 def _tavily_search(query: str) -> list:
     """
     Runs Tavily advanced search.
-    Returns list of {title, url, content} dicts.
+    Returns list of {title, url, content, source} dicts.
     """
     try:
         client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
@@ -113,7 +134,7 @@ def _tavily_search(query: str) -> list:
 def _ddg_search(query: str) -> list:
     """
     Runs DuckDuckGo text search.
-    Returns list of {title, url, content} dicts.
+    Returns list of {title, url, content, source} dicts.
     No API key required.
     """
     try:
@@ -152,13 +173,12 @@ def _wikipedia_search(query: str) -> list:
     try:
         wikipedia.set_lang("en")
 
-        # Try exact search first
         search_results = wikipedia.search(query, results=3)
         if not search_results:
             return []
 
         articles = []
-        for title in search_results[:2]:  # top 2 Wikipedia matches
+        for title in search_results[:2]:
             try:
                 page = wikipedia.page(title, auto_suggest=False)
                 content = _clean_text(page.content)
@@ -173,7 +193,6 @@ def _wikipedia_search(query: str) -> list:
                     "source":  "Wikipedia",
                 })
             except wikipedia.exceptions.DisambiguationError as e:
-                # Pick first option from disambiguation
                 try:
                     page = wikipedia.page(e.options[0], auto_suggest=False)
                     content = _clean_text(page.content)
@@ -208,25 +227,22 @@ def _merge_results(all_results: list) -> list:
     seen_urls = set()
     clean = []
     skipped_duplicate = 0
-    skipped_domain = 0
-    skipped_thin = 0
+    skipped_domain    = 0
+    skipped_thin      = 0
 
     for r in all_results:
         url = r.get("url", "")
 
-        # Deduplicate
         if url and url in seen_urls:
             skipped_duplicate += 1
             continue
         if url:
             seen_urls.add(url)
 
-        # Domain quality filter
         if _is_low_quality(url):
             skipped_domain += 1
             continue
 
-        # Thin content filter
         if _is_thin(r.get("content", "")):
             skipped_thin += 1
             continue
@@ -251,9 +267,10 @@ def _build_context(results: list) -> tuple[str, int]:
     """
     Converts clean result list into numbered [SOURCE N] context string
     for the researcher agent.
+    Content capped at CONTENT_LIMIT (1500 chars) per source.
     Returns (context_string, source_count).
     """
-    context = ""
+    context      = ""
     source_count = 0
 
     for r in results:
@@ -273,18 +290,19 @@ def _build_context(results: list) -> tuple[str, int]:
 # MAIN ENTRY POINT
 # ================================================================
 
-def search_web(query: str) -> tuple[str, int]:
+def search_web(query: str) -> tuple[str, str, int]:
     """
     Multi-source search pipeline:
       Tavily + DuckDuckGo + Wikipedia
 
     Runs TWO searches per source:
       1. General: "{query}"
-      2. Limitations: "{query} limitations disadvantages problems"
+      2. Limitations: "{query} limitations disadvantages problems weaknesses"
 
     Returns:
-      - context string (for researcher agent)
-      - source_count int (for metrics)
+      - context string       (for researcher agent — full numbered sources)
+      - quotes_only string   (for validator agent — extracted quotes only)
+      - source_count int     (for metrics)
     """
 
     limitations_query = f"{query} limitations disadvantages problems weaknesses"
@@ -330,9 +348,7 @@ def search_web(query: str) -> tuple[str, int]:
     time.sleep(SEARCH_DELAY_SECONDS)
 
     # ----------------------------------------------------------------
-    # WIKIPEDIA — fetches top 2 articles for the topic
-    # Wikipedia already covers limitations/criticism internally
-    # so only one search needed
+    # WIKIPEDIA — one search only, articles already have limitations section
     # ----------------------------------------------------------------
     print(f"\n[3/3] Wikipedia — fetching articles...")
     wiki_results = _wikipedia_search(query)
@@ -363,10 +379,17 @@ def search_web(query: str) -> tuple[str, int]:
     # ----------------------------------------------------------------
     if not clean_results:
         print("⚠ No clean sources found after filtering.")
-        return "No search results found.", 0
+        return "No search results found.", "", 0
 
     context, source_count = _build_context(clean_results)
 
-    print(f"\n✅ {source_count} sources passed to researcher agent\n")
+    # ----------------------------------------------------------------
+    # BUILD QUOTES-ONLY STRING FOR VALIDATOR
+    # Validator receives this instead of full context — major token saving
+    # ----------------------------------------------------------------
+    quotes_only = extract_quotes(context)
 
-    return context, source_count
+    print(f"\n✅ {source_count} sources passed to researcher agent")
+    print(f"   📎 {len(quotes_only.splitlines())} quotes extracted for validator\n")
+
+    return context, quotes_only, source_count
