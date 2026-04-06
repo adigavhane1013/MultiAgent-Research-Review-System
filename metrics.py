@@ -11,12 +11,14 @@ def calculate_metrics(
     elapsed_seconds: float = 0.0,
     retry_used: bool = False,
     source_count: int = 0,
+    token_tracker: dict = None,
 ) -> dict:
     """
     Parses validation output and computes structured metrics.
     Handles multiple LLM output formats:
     - Standard: "CLAIM:", "VERIFIED: YES", "CITE_TAG_PRESENT: YES"
     - Extended: "QUOTE_IN_SOURCES: YES/NO", "DUPLICATE_EVIDENCE: YES/NO"
+    - Compact:  "C:", "Q: YES/NO | D: YES/NO | S: YES/NO | V: PASS/FAIL"
     """
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -38,6 +40,55 @@ def calculate_metrics(
 
     # Track duplicate evidence abuse (same quote used for multiple claims)
     duplicate_evidence = _count_pattern(validation_output, r"DUPLICATE_EVIDENCE\s*:\s*YES")
+
+    # ----------------------------------------------------------------
+    # COMPACT FORMAT — extract per-claim data (Fix 5: C:/Q:/D:/S:/V: format)
+    # ----------------------------------------------------------------
+    claims = extract_claims(validation_output)
+
+    if claims:
+        compact_total    = len(claims)
+        compact_verified = sum(1 for c in claims if c["predicted"])
+        compact_fab      = sum(1 for c in claims if not c["quote_exists"])
+        compact_dup      = sum(1 for c in claims if c["duplicate"])
+
+        # Use compact counts to fill gaps when legacy counts are zero
+        if total_claims == 0:
+            total_claims = compact_total
+        if verified_yes == 0:
+            verified_yes = compact_verified
+        if quotes_not_in_sources == 0:
+            quotes_not_in_sources = compact_fab
+        if duplicate_evidence == 0:
+            duplicate_evidence = compact_dup
+
+    # ----------------------------------------------------------------
+    # ML METRICS — Precision, Recall, F1, Hallucination Rate
+    # Computed from compact per-claim data when available.
+    # Note: FN = 0 because no ground truth labels exist — honest limitation.
+    # ----------------------------------------------------------------
+    if claims:
+        TP = sum(
+            1 for c in claims
+            if c["predicted"]
+            and c["quote_exists"]
+            and c["semantic_match"]
+            and not c["duplicate"]
+        )
+        FP = sum(
+            1 for c in claims
+            if c["predicted"]
+            and not (c["quote_exists"] and c["semantic_match"] and not c["duplicate"])
+        )
+        TN = sum(1 for c in claims if not c["predicted"])
+        FN = 0  # No ground truth labels — acknowledged limitation
+
+        precision          = round(TP / (TP + FP), 3) if (TP + FP) else 0.0
+        recall             = round(TP / (TP + FN), 3) if (TP + FN) else 0.0
+        f1                 = round(2 * precision * recall / (precision + recall), 3) if (precision + recall) else 0.0
+        hallucination_rate = round(FP / (TP + FP), 3) if (TP + FP) else 0.0
+    else:
+        precision = recall = f1 = hallucination_rate = 0.0
 
     # ----------------------------------------------------------------
     # FALLBACK 1: CLAIM: tags missing but VERIFIED counts exist
@@ -148,6 +199,19 @@ def calculate_metrics(
     print(f"  Run Duration:              {elapsed_minutes} mins")
     print(f"  Retry Used:                {'Yes' if retry_used else 'No'}")
     print(f"  Verdict:                   {verdict}")
+    if claims:
+        print(f"  ── ML Metrics ──────────────────────────")
+        print(f"  Claims Extracted:          {len(claims)}")
+        print(f"  Precision:                 {precision}")
+        print(f"  Recall:                    {recall}")
+        print(f"  F1 Score:                  {f1}")
+        print(f"  Hallucination Rate:        {hallucination_rate}")
+    if token_tracker:
+        print(f"  ── Token Usage (estimated) ─────────────")
+        print(f"  Researcher Tokens:         {token_tracker.get('researcher', 0)}")
+        print(f"  Writer Tokens:             {token_tracker.get('writer', 0)}")
+        print(f"  Validator Tokens:          {token_tracker.get('validator', 0)}")
+        print(f"  Total Tokens:              {token_tracker.get('total', 0)}")
     print("═" * 55)
 
     return {
@@ -170,7 +234,53 @@ def calculate_metrics(
         "run_duration_minutes":         elapsed_minutes,
         "retry_used":                   retry_used,
         "verdict":                      verdict,
+        "claims":                       claims,
+        "precision":                    precision,
+        "recall":                       recall,
+        "f1_score":                     f1,
+        "hallucination_rate":           hallucination_rate,
+        "tokens":                       token_tracker or {},
+        "total_tokens":                 (token_tracker or {}).get("total", 0),
     }
+
+
+def extract_claims(validation_output: str) -> list:
+    """
+    Extracts per-claim data from compact validator format (Fix 5).
+
+    Parses lines like:
+        C: Redis stores data in memory.
+        Q: YES | D: NO | S: YES | V: PASS
+
+    Returns a list of dicts, one per claim:
+        {
+            "claim":          str,
+            "quote_exists":   bool,  # Q: YES/NO
+            "duplicate":      bool,  # D: YES/NO
+            "semantic_match": bool,  # S: YES/NO
+            "predicted":      bool,  # V: PASS/FAIL
+        }
+
+    Returns empty list if no compact format claims found (legacy format run).
+    """
+    if not validation_output:
+        return []
+
+    claims = []
+    pattern = r"C:\s*(.*?)\nQ:\s*(YES|NO)\s*\|\s*D:\s*(YES|NO)\s*\|\s*S:\s*(YES|NO)\s*\|\s*V:\s*(PASS|FAIL)"
+    matches = re.findall(pattern, validation_output, re.DOTALL)
+
+    for m in matches:
+        claim_text, Q, D, S, V = m
+        claims.append({
+            "claim":          claim_text.strip(),
+            "quote_exists":   Q == "YES",
+            "duplicate":      D == "YES",
+            "semantic_match": S == "YES",
+            "predicted":      V == "PASS",
+        })
+
+    return claims
 
 
 def _count_pattern(text: str, pattern: str) -> int:

@@ -19,6 +19,19 @@ if not os.getenv("TESTING"):
 
 
 # ================================================================
+# TOKEN ESTIMATION
+# Approximates token count per agent output.
+# 1 token ≈ 0.75 words — standard industry approximation.
+# Not exact but honest — better than nothing.
+# ================================================================
+
+def estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
+    return int(len(text.split()) * 1.3)
+
+
+# ================================================================
 # GUARD 1 — Research output quality check
 # ================================================================
 
@@ -315,31 +328,42 @@ def _is_valid_validator_output(validator_output: str) -> bool:
 def _validate_result(result, topic):
     """
     Runs all 4 quality guards on a crew result.
-    Returns (validation_output, verdict) where verdict is "PASS" or "FAIL".
+    Returns (validation_output, verdict, token_tracker).
     Never calls sys.exit — caller decides what to do with FAIL.
     """
     # Guard 1 — Research
     research_output = result.tasks_output[0].raw
     if not _is_valid_research_output(research_output):
         print("⚠ Guard 1 triggered — research output invalid.")
-        return "", "FAIL"
+        return "", "FAIL", {}
 
     # Guard 2 — Writer
     writer_output = result.tasks_output[1].raw
     if not _is_valid_writer_output(writer_output):
         print("⚠ Guard 2 triggered — writer output invalid.")
-        return "", "FAIL"
+        return "", "FAIL", {}
 
     # Guard 4 — Validator (check before Guard 3)
     validation_output = result.tasks_output[2].raw
     if not _is_valid_validator_output(validation_output):
         print("⚠ Guard 4 triggered — validator output invalid.")
-        return validation_output, "FAIL"
+        return validation_output, "FAIL", {}
 
     # Guard 3 — Verdict override
     verdict = _get_true_verdict(validation_output)
 
-    return validation_output, verdict
+    # Token tracking — estimated per agent output
+    r_tokens = estimate_tokens(research_output)
+    w_tokens = estimate_tokens(writer_output)
+    v_tokens = estimate_tokens(validation_output)
+    token_tracker = {
+        "researcher": r_tokens,
+        "writer":     w_tokens,
+        "validator":  v_tokens,
+        "total":      r_tokens + w_tokens + v_tokens,
+    }
+
+    return validation_output, verdict, token_tracker
 
 
 # ================================================================
@@ -513,7 +537,7 @@ def run():
     # 4. FIRST FULL RUN (writer + validator)
     # ------------------------------------------------------------------
     result = _kickoff_with_delays(crew)
-    validation_output, verdict = _validate_result(result, topic)
+    validation_output, verdict, token_tracker = _validate_result(result, topic)
 
     retry_used = False
 
@@ -525,13 +549,14 @@ def run():
         retry_used = True
 
         retry_result = _kickoff_with_delays(crew)
-        retry_validation_output, retry_verdict = _validate_result(retry_result, topic)
+        retry_validation_output, retry_verdict, retry_token_tracker = _validate_result(retry_result, topic)
 
         if retry_verdict == "PASS":
             print("✅ Retry succeeded.\n")
             result            = retry_result
             validation_output = retry_validation_output
             verdict           = "PASS"
+            token_tracker     = retry_token_tracker
         else:
             elapsed_seconds = time.time() - start_time
             print("\n❌ Retry also failed. Saving failed run report...\n")
@@ -543,6 +568,7 @@ def run():
                 elapsed_seconds=elapsed_seconds,
                 retry_used=retry_used,
                 source_count=source_count,
+                token_tracker=retry_token_tracker,
             )
             save_metrics(metrics_data)
             sys.exit(1)
@@ -562,6 +588,7 @@ def run():
         elapsed_seconds=elapsed_seconds,
         retry_used=retry_used,
         source_count=source_count,
+        token_tracker=token_tracker,
     )
 
     save_metrics(metrics_data)

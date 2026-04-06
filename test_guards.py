@@ -770,3 +770,226 @@ def test_guard4_mixed_compact_and_legacy_accepted():
         'Verdict: PASS\n'
     )
     assert _is_valid_validator_output(mixed) is True
+
+
+# ================================================================
+# EXTRACT CLAIMS — per-claim compact format parsing (metrics.py)
+# ================================================================
+
+from metrics import extract_claims
+
+
+def test_extract_claims_parses_valid_compact():
+    """✅ Valid compact output — all 3 claims extracted correctly"""
+    output = (
+        'C: Redis stores data in memory for fast read and write operations.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis was created by Salvatore Sanfilippo and released in 2009.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Uber uses Redis for real-time trip tracking at scale.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 3
+    assert claims[0]["claim"] == "Redis stores data in memory for fast read and write operations."
+    assert claims[0]["quote_exists"]   is True
+    assert claims[0]["duplicate"]      is False
+    assert claims[0]["semantic_match"] is True
+    assert claims[0]["predicted"]      is True
+
+
+def test_extract_claims_detects_fabricated_quote():
+    """❌ Q: NO means quote not found in sources — quote_exists must be False"""
+    output = (
+        'C: Redis was invented in 2005 by engineers at Twitter.\n'
+        'Q: NO | D: NO | S: NO | V: FAIL\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 1
+    assert claims[0]["quote_exists"]   is False
+    assert claims[0]["semantic_match"] is False
+    assert claims[0]["predicted"]      is False
+
+
+def test_extract_claims_detects_duplicate_evidence():
+    """❌ D: YES means same quote used twice — duplicate must be True"""
+    output = (
+        'C: Redis supports pub/sub messaging for event-driven architectures.\n'
+        'Q: YES | D: YES | S: YES | V: PASS\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 1
+    assert claims[0]["duplicate"] is True
+
+
+def test_extract_claims_detects_semantic_mismatch():
+    """❌ S: NO means quote meaning contradicts the claim — semantic_match False"""
+    output = (
+        'C: Redis has serious limitations and is known to be unreliable.\n'
+        'Q: YES | D: NO | S: NO | V: FAIL\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 1
+    assert claims[0]["semantic_match"] is False
+    assert claims[0]["predicted"]      is False
+
+
+def test_extract_claims_empty_input():
+    """❌ Empty string returns empty list — no crash"""
+    assert extract_claims("") == []
+
+
+def test_extract_claims_none_input():
+    """❌ None returns empty list — no crash"""
+    assert extract_claims(None) == []
+
+
+def test_extract_claims_legacy_format_returns_empty():
+    """✅ Legacy CLAIM:/VERIFIED: format returns empty list — not a compact run"""
+    legacy = (
+        'CLAIM: Redis is fast.\n'
+        'VERIFIED: YES\n'
+        'VERDICT: PASS\n'
+    )
+    assert extract_claims(legacy) == []
+
+
+def test_extract_claims_mixed_pass_and_fail():
+    """✅ Mixed results — correctly identifies which claims passed and failed"""
+    output = (
+        'C: Redis is an open-source in-memory database used in production.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis was invented at Google in 2010 by a large team.\n'
+        'Q: NO | D: NO | S: NO | V: FAIL\n'
+        'C: Twitter uses Redis to store user timeline data at scale.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 3
+    assert claims[0]["predicted"] is True
+    assert claims[1]["predicted"] is False
+    assert claims[1]["quote_exists"] is False
+    assert claims[2]["predicted"] is True
+
+
+def test_extract_claims_count_matches_validator_audit():
+    """✅ Number of extracted claims equals number of C: lines in output"""
+    output = (
+        'C: Redis supports atomic operations natively.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis is written in ANSI C for portability.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis Cluster supports automatic data sharding across nodes.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis has no built-in access control in older versions.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 4
+
+
+# ================================================================
+# EXTRACT CLAIMS — per-claim data extraction from compact format
+# ================================================================
+
+from metrics import extract_claims
+
+
+def test_extract_claims_parses_compact_format():
+    """✅ Standard compact format — 3 claims should be extracted correctly"""
+    output = (
+        'C: Redis stores data in memory for fast access.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis was created by Salvatore Sanfilippo in 2009.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Uber uses Redis for real-time driver location caching.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'Structure Score: 10/10\nClarity Score: 10/10\nFactual Confidence: 10/10\nVerdict: PASS\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 3
+    assert claims[0]["claim"] == "Redis stores data in memory for fast access."
+    assert claims[0]["quote_exists"]   is True
+    assert claims[0]["duplicate"]      is False
+    assert claims[0]["semantic_match"] is True
+    assert claims[0]["predicted"]      is True
+
+
+def test_extract_claims_detects_fabricated_quote():
+    """❌ Q: NO — quote_exists must be False"""
+    output = (
+        'C: Redis was invented in 2005 by a team at Facebook.\n'
+        'Q: NO | D: NO | S: NO | V: FAIL\n'
+        'Structure Score: 5/10\nClarity Score: 5/10\nFactual Confidence: 5/10\nVerdict: FAIL\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 1
+    assert claims[0]["quote_exists"]   is False
+    assert claims[0]["duplicate"]      is False
+    assert claims[0]["semantic_match"] is False
+    assert claims[0]["predicted"]      is False
+
+
+def test_extract_claims_detects_duplicate_evidence():
+    """❌ D: YES — duplicate must be True"""
+    output = (
+        'C: Redis supports pub/sub messaging for event-driven systems.\n'
+        'Q: YES | D: YES | S: YES | V: PASS\n'
+        'Structure Score: 8/10\nClarity Score: 8/10\nFactual Confidence: 8/10\nVerdict: PASS\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 1
+    assert claims[0]["duplicate"] is True
+    assert claims[0]["quote_exists"] is True
+
+
+def test_extract_claims_detects_semantic_mismatch():
+    """❌ S: NO — semantic_match must be False"""
+    output = (
+        'C: Redis has serious limitations and is known to be unreliable.\n'
+        'Q: YES | D: NO | S: NO | V: FAIL\n'
+        'Structure Score: 7/10\nClarity Score: 7/10\nFactual Confidence: 7/10\nVerdict: FAIL\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 1
+    assert claims[0]["semantic_match"] is False
+    assert claims[0]["predicted"]      is False
+
+
+def test_extract_claims_returns_empty_for_legacy_format():
+    """✅ Legacy format output — no compact C: lines — returns empty list"""
+    legacy_output = (
+        'CLAIM: Redis is a fast in-memory store.\n'
+        'VERIFIED: YES\nVERDICT: PASS\n'
+        'Structure Score: 10/10\nClarity Score: 10/10\nFactual Confidence: 10/10\nVerdict: PASS\n'
+    )
+    claims = extract_claims(legacy_output)
+    assert claims == []
+
+
+def test_extract_claims_returns_empty_for_none():
+    """✅ None input — returns empty list without crashing"""
+    assert extract_claims(None) == []
+
+
+def test_extract_claims_returns_empty_for_empty_string():
+    """✅ Empty string — returns empty list"""
+    assert extract_claims("") == []
+
+
+def test_extract_claims_multiple_mixed_verdicts():
+    """✅ Mix of PASS and FAIL claims — all extracted with correct predicted values"""
+    output = (
+        'C: Redis stores data in memory.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'C: Redis was invented at Twitter in 2006.\n'
+        'Q: NO | D: NO | S: NO | V: FAIL\n'
+        'C: Uber uses Redis for trip tracking.\n'
+        'Q: YES | D: NO | S: YES | V: PASS\n'
+        'Structure Score: 8/10\nClarity Score: 8/10\nFactual Confidence: 8/10\nVerdict: FAIL\n'
+    )
+    claims = extract_claims(output)
+    assert len(claims) == 3
+    assert claims[0]["predicted"] is True
+    assert claims[1]["predicted"] is False
+    assert claims[2]["predicted"] is True
